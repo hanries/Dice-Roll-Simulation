@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bakugan vs Beyblade Simulation</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: sans-serif; background: #f5f5f3; color: #1a1a1a; padding: 24px; max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 20px; font-weight: 500; margin-bottom: 4px; }
+    .subtitle { font-size: 13px; color: #666; margin-bottom: 24px; }
+
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+    .stat-card { background: #ebebeb; border-radius: 8px; padding: 12px 14px; }
+    .stat-label { font-size: 12px; color: #666; margin-bottom: 4px; }
+    .stat-value { font-size: 22px; font-weight: 500; }
+    .stat-value.blue { color: #185FA5; }
+    .stat-value.green { color: #3B6D11; }
+
+    .controls { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
+    button { padding: 8px 16px; font-size: 13px; cursor: pointer; border: 1px solid #ccc; border-radius: 6px; background: white; }
+    button:hover { background: #f0f0f0; }
+    button.reset { border-color: #e87a5a; color: #993C1D; }
+    button.reset:hover { background: #FAECE7; }
+    .true-answer { font-size: 12px; color: #666; margin-left: 4px; }
+
+    .last-sim { margin-bottom: 16px; background: #ebebeb; border-radius: 8px; padding: 12px 14px; display: none; }
+    .last-sim-label { font-size: 12px; color: #666; margin-bottom: 6px; }
+    .toy-sequence { display: flex; flex-wrap: wrap; gap: 2px; margin-bottom: 8px; }
+    .toy-badge { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 6px; font-size: 13px; font-weight: 500; }
+    .b-badge { background: #E6F1FB; color: #0C447C; }
+    .y-badge { background: #FAECE7; color: #993C1D; }
+    .verdict { font-size: 13px; }
+    .win-b { background: #E6F1FB; color: #185FA5; border-radius: 6px; padding: 2px 8px; font-size: 12px; font-weight: 500; }
+    .win-y { background: #FCEBEB; color: #A32D2D; border-radius: 6px; padding: 2px 8px; font-size: 12px; font-weight: 500; }
+
+    .chart-wrapper { position: relative; width: 100%; height: 260px; margin-bottom: 6px; }
+    .chart-caption { font-size: 12px; color: #666; text-align: center; margin-bottom: 24px; }
+
+    .how-it-works { background: white; border-radius: 8px; padding: 16px; border: 1px solid #e0e0e0; }
+    .how-it-works h2 { font-size: 15px; font-weight: 500; margin-bottom: 10px; }
+    .how-it-works p { font-size: 13px; color: #444; line-height: 1.6; margin-bottom: 8px; }
+    .how-it-works code { background: #f0f0f0; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  </style>
+</head>
+<body>
+
+  <h1>Bakugan vs Beyblade — Monte Carlo Simulation</h1>
+  <p class="subtitle">Simulating P(3rd Bakugan manufactured before 2nd Beyblade) where each toy ~ Exp(1)</p>
+
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-label">Simulations run</div>
+      <div class="stat-value" id="stat-n">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Bakugan wins</div>
+      <div class="stat-value blue" id="stat-b">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Estimated P</div>
+      <div class="stat-value" id="stat-p">—</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button onclick="runSims(1)">Run 1</button>
+    <button onclick="runSims(100)">Run 100</button>
+    <button onclick="runSims(1000)">Run 1,000</button>
+    <button onclick="runSims(10000)">Run 10,000</button>
+    <button class="reset" onclick="resetAll()">Reset</button>
+    <span class="true-answer">True answer: 5/16 = 0.3125</span>
+  </div>
+
+  <div class="last-sim" id="last-sim">
+    <div class="last-sim-label">Last simulation — toy sequence:</div>
+    <div class="toy-sequence" id="toy-sequence"></div>
+    <div class="verdict" id="sim-verdict"></div>
+  </div>
+
+  <div class="chart-wrapper">
+    <canvas id="convChart"></canvas>
+  </div>
+  <p class="chart-caption">Estimated probability converging toward 5/16 = 0.3125 (orange dashed line)</p>
+
+  <div class="how-it-works">
+    <h2>How this simulation works</h2>
+    <p>Each round, two independent Exp(1) random variables are drawn — one per machine. The smaller one wins that toy slot, labelled B (Bakugan) or Y (Beyblade). This repeats until either the 3rd B or 2nd Y appears.</p>
+    <p>To generate an Exp(1) random variable in JavaScript, we use the inverse transform method: <code>-Math.log(1 - Math.random())</code>. This works because if U ~ Uniform(0,1), then -log(U) ~ Exp(1).</p>
+    <p>As you run more simulations, the estimated probability converges to the true answer of <strong>5/16 = 0.3125</strong> by the Law of Large Numbers.</p>
+  </div>
+
+  <script>
+    let totalRuns = 0, bakuganWins = 0;
+    const historyX = [], historyY = [];
+
+    // Generate Exp(1) random variable using inverse transform
+    function expRandom() {
+      return -Math.log(1 - Math.random());
+    }
+
+    // Run one simulation — returns winner and sequence of toys
+    function runOneSim() {
+      let bCount = 0, yCount = 0;
+      const sequence = [];
+      while (true) {
+        const a = expRandom(); // Bakugan machine time
+        const b = expRandom(); // Beyblade machine time
+        if (a < b) {
+          bCount++;
+          sequence.push('B');
+        } else {
+          yCount++;
+          sequence.push('Y');
+        }
+        if (bCount === 3) return { winner: 'B', sequence };
+        if (yCount === 2) return { winner: 'Y', sequence };
+      }
+    }
+
+    // Set up convergence chart
+    const ctx = document.getElementById('convChart').getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: historyX,
+        datasets: [
+          {
+            label: 'Estimated P',
+            data: historyY,
+            borderColor: '#378ADD',
+            borderWidth: 2,
+            pointRadius: 0,
+            fill: false,
+            tension: 0.2
+          },
+          {
+            label: 'True answer 5/16',
+            data: [],
+            borderColor: '#D85A30',
+            borderWidth: 1.5,
+            borderDash: [5, 5],
+            pointRadius: 0,
+            fill: false
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { enabled: false }
+        },
+        scales: {
+          x: {
+            title: { display: true, text: 'Number of simulations', color: '#888', font: { size: 11 } },
+            ticks: { color: '#888', font: { size: 10 }, maxTicksLimit: 8 },
+            grid: { color: 'rgba(128,128,128,0.1)' }
+          },
+          y: {
+            min: 0, max: 1,
+            title: { display: true, text: 'P(Bakugan wins)', color: '#888', font: { size: 11 } },
+            ticks: { color: '#888', font: { size: 10 }, maxTicksLimit: 6 },
+            grid: { color: 'rgba(128,128,128,0.1)' }
+          }
+        }
+      }
+    });
+
+    function runSims(n) {
+      let lastResult = null;
+      for (let i = 0; i < n; i++) {
+        const result = runOneSim();
+        lastResult = result;
+        totalRuns++;
+        if (result.winner === 'B') bakuganWins++;
+
+        // Record history points (all for small n, sampled for large n)
+        if (totalRuns <= 50 || totalRuns % 10 === 0 || i === n - 1) {
+          historyX.push(totalRuns);
+          historyY.push(parseFloat((bakuganWins / totalRuns).toFixed(4)));
+        }
+      }
+
+      // Update stat cards
+      document.getElementById('stat-n').textContent = totalRuns.toLocaleString();
+      document.getElementById('stat-b').textContent = bakuganWins.toLocaleString();
+      const p = bakuganWins / totalRuns;
+      const pEl = document.getElementById('stat-p');
+      pEl.textContent = p.toFixed(4);
+      pEl.style.color = Math.abs(p - 5/16) < 0.01 ? '#3B6D11' : '#1a1a1a';
+
+      // Show last single simulation details
+      if (n === 1 && lastResult) {
+        const panel = document.getElementById('last-sim');
+        panel.style.display = 'block';
+        const seq = document.getElementById('toy-sequence');
+        seq.innerHTML = '';
+        lastResult.sequence.forEach(t => {
+          const span = document.createElement('span');
+          span.className = 'toy-badge ' + (t === 'B' ? 'b-badge' : 'y-badge');
+          span.textContent = t;
+          seq.appendChild(span);
+        });
+        const verdict = document.getElementById('sim-verdict');
+        if (lastResult.winner === 'B') {
+          verdict.innerHTML = '<span class="win-b">Bakugan wins</span> — 3rd Bakugan appeared before 2nd Beyblade';
+        } else {
+          verdict.innerHTML = '<span class="win-y">Beyblade wins</span> — 2nd Beyblade appeared before 3rd Bakugan';
+        }
+      }
+
+      // Update chart
+      chart.data.labels = [...historyX];
+      chart.data.datasets[0].data = [...historyY];
+      chart.data.datasets[1].data = Array(historyX.length).fill(5/16);
+      chart.update('none');
+    }
+
+    function resetAll() {
+      totalRuns = 0;
+      bakuganWins = 0;
+      historyX.length = 0;
+      historyY.length = 0;
+      document.getElementById('stat-n').textContent = '0';
+      document.getElementById('stat-b').textContent = '0';
+      const pEl = document.getElementById('stat-p');
+      pEl.textContent = '—';
+      pEl.style.color = '#1a1a1a';
+      document.getElementById('last-sim').style.display = 'none';
+      chart.data.labels = [];
+      chart.data.datasets[0].data = [];
+      chart.data.datasets[1].data = [];
+      chart.update('none');
+    }
+  </script>
+</body>
+</html>
