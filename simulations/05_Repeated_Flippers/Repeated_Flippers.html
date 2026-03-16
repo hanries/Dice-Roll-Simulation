@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coin Flip Simulation</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0d0d0f; --surface: #151518; --surface2: #1c1c21;
+    --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.13);
+    --text: #f0ede8; --text-muted: #7a7880; --text-dim: #4a4858;
+    --heads: #c8f5a0; --heads-dim: #2a3d1a; --heads-border: #6bbf35;
+    --tails: #f5c0a0; --tails-dim: #3d2a1a; --tails-border: #bf7535;
+    --accent: #a78bfa; --accent-dim: #2d1f5e;
+    --coin-size: 36px;
+  }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; padding: 40px 20px 60px;
+  }
+  header { text-align: center; margin-bottom: 40px; }
+  h1 {
+    font-family: 'Syne', sans-serif; font-weight: 800;
+    font-size: clamp(28px, 5vw, 48px); letter-spacing: -1px;
+    color: var(--text); line-height: 1.1;
+  }
+  h1 span { color: var(--accent); }
+  .subtitle { font-size: 13px; color: var(--text-muted); margin-top: 10px; letter-spacing: 0.5px; }
+  .main { width: 100%; max-width: 860px; display: flex; flex-direction: column; gap: 16px; }
+
+  .panel {
+    background: var(--surface); border: 0.5px solid var(--border2);
+    border-radius: 16px; padding: 24px;
+  }
+  .panel-label {
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--text-dim); margin-bottom: 16px; font-weight: 500;
+  }
+  .controls-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+  .cg-label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 8px; letter-spacing: 1px; text-transform: uppercase; }
+  .slider-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  input[type="range"] {
+    flex: 1; -webkit-appearance: none; appearance: none;
+    height: 3px; background: var(--surface2); border-radius: 2px;
+    outline: none; border: 0.5px solid var(--border2);
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px;
+    border-radius: 50%; background: var(--accent);
+    cursor: pointer; border: 2px solid var(--bg);
+  }
+  .sval { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; color: var(--accent); min-width: 48px; text-align: right; }
+  .sval-sm { font-size: 12px; color: var(--accent); min-width: 68px; text-align: right; }
+
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+  button {
+    font-family: 'DM Mono', monospace; font-size: 12px;
+    padding: 9px 16px; border-radius: 8px;
+    border: 0.5px solid var(--border2); background: var(--surface2);
+    color: var(--text); cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    letter-spacing: 0.3px; white-space: nowrap;
+  }
+  button:hover { background: #252530; border-color: rgba(255,255,255,0.2); }
+  button:active { transform: scale(0.97); }
+  button:disabled { opacity: 0.38; cursor: not-allowed; transform: none; }
+  button.primary { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); font-weight: 500; }
+  button.primary:hover { background: #3a2870; }
+  button.reset { color: var(--text-muted); }
+
+  /* Stats */
+  .stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
+  .stat { background: var(--surface2); border-radius: 10px; padding: 14px 12px; text-align: center; border: 0.5px solid var(--border); }
+  .stat-val { font-family: 'Syne', sans-serif; font-size: 24px; font-weight: 800; color: var(--text); line-height: 1; }
+  .stat-lbl { font-size: 10px; color: var(--text-dim); margin-top: 5px; letter-spacing: 0.8px; text-transform: uppercase; }
+
+  .outcome-section { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  .outcome-card { border-radius: 12px; padding: 16px; border: 0.5px solid; }
+  .outcome-card.heads-card { background: var(--heads-dim); border-color: var(--heads-border); }
+  .outcome-card.exhaust-card { background: var(--tails-dim); border-color: var(--tails-border); }
+  .outcome-title { font-family: 'Syne', sans-serif; font-weight: 600; font-size: 13px; margin-bottom: 8px; }
+  .heads-card .outcome-title { color: var(--heads); }
+  .exhaust-card .outcome-title { color: var(--tails); }
+  .outcome-big { font-family: 'Syne', sans-serif; font-size: 32px; font-weight: 800; line-height: 1; }
+  .heads-card .outcome-big { color: var(--heads); }
+  .exhaust-card .outcome-big { color: var(--tails); }
+  .outcome-sub { font-size: 11px; margin-top: 4px; opacity: 0.7; }
+  .heads-card .outcome-sub { color: var(--heads); }
+  .exhaust-card .outcome-sub { color: var(--tails); }
+  .bar-track { height: 6px; background: rgba(0,0,0,0.3); border-radius: 3px; margin-top: 12px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s cubic-bezier(0.4,0,0.2,1); width: 0%; }
+  .heads-card .bar-fill { background: var(--heads); }
+  .exhaust-card .bar-fill { background: var(--tails); }
+
+  /* Probability chart */
+  .chart-wrap { position: relative; width: 100%; height: 200px; }
+  #prob-canvas { width: 100%; height: 100%; }
+  .chart-legend {
+    display: flex; gap: 18px; margin-bottom: 12px; font-size: 11px; color: var(--text-muted);
+  }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 5px; vertical-align: middle; }
+
+  /* Live game */
+  .game-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+  .round-badge { font-size: 11px; color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase; }
+  .round-badge span { color: var(--accent); font-family: 'Syne', sans-serif; font-weight: 700; font-size: 15px; }
+  .result-tag { display: inline-block; font-size: 10px; padding: 3px 12px; border-radius: 20px; font-weight: 500; letter-spacing: 0.5px; }
+  .result-tag.all-heads { background: var(--heads-dim); color: var(--heads); border: 0.5px solid var(--heads-border); }
+  .result-tag.exhausted { background: var(--tails-dim); color: var(--tails); border: 0.5px solid var(--tails-border); }
+
+  .step-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+
+  .coin-arena { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; min-height: 50px; padding: 4px 0 8px; }
+  .coin {
+    width: var(--coin-size); height: var(--coin-size); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 500; border: 1.5px solid;
+    transition: background 0.22s ease, border-color 0.22s ease, color 0.22s ease,
+                opacity 0.32s ease, transform 0.32s ease;
+  }
+  .coin.s-idle    { background: var(--surface2);  border-color: var(--border2);       color: var(--text-dim); }
+  .coin.s-heads   { background: var(--heads-dim);  border-color: var(--heads-border);  color: var(--heads); }
+  .coin.s-tails   { background: var(--tails-dim);  border-color: var(--tails-border);  color: var(--tails); }
+  .coin.s-remove  { opacity: 0; transform: scale(0.3); pointer-events: none; }
+  .coin.s-gone    { opacity: 0; border-color: transparent; background: transparent; color: transparent; pointer-events: none; }
+
+  .round-history { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
+  .rrow {
+    display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+    background: var(--surface2); border-radius: 8px; border: 0.5px solid var(--border);
+    font-size: 12px; opacity: 0; transform: translateY(5px);
+    transition: opacity 0.28s ease, transform 0.28s ease;
+  }
+  .rrow.show { opacity: 1; transform: translateY(0); }
+  .rrow.final-h { border-color: var(--heads-border); background: var(--heads-dim); }
+  .rrow.final-e { border-color: var(--tails-border); background: var(--tails-dim); }
+  .rn { color: var(--text-dim); min-width: 58px; font-size: 11px; }
+  .rd { color: var(--text-muted); flex: 1; }
+  .rrow.final-h .rn, .rrow.final-h .rd { color: var(--heads); }
+  .rrow.final-e .rn, .rrow.final-e .rd { color: var(--tails); }
+  .ch { color: var(--heads); font-weight: 500; }
+  .ct { color: var(--tails); font-weight: 500; }
+  .empty-hint { font-size: 12px; color: var(--text-dim); font-style: italic; text-align: center; padding: 12px 0; }
+
+  @media (max-width: 560px) {
+    .stats-grid { grid-template-columns: repeat(2,1fr); }
+    .controls-grid { grid-template-columns: 1fr; }
+    .outcome-section { grid-template-columns: 1fr; }
+    :root { --coin-size: 28px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Coin Flip<span>.</span></h1>
+  <p class="subtitle">flip → remove tails → repeat until all remaining coins show heads, or none remain</p>
+</header>
+
+<div class="main">
+
+  <!-- Controls -->
+  <div class="panel">
+    <div class="panel-label">Settings</div>
+    <div class="controls-grid">
+      <div>
+        <span class="cg-label">Number of coins</span>
+        <div class="slider-row">
+          <input type="range" id="sl-coins" min="1" max="50" value="25" step="1"
+            oninput="numCoins=+this.value; document.getElementById('dv-coins').textContent=this.value">
+          <div class="sval" id="dv-coins">25</div>
+        </div>
+        <span class="cg-label">Animation speed</span>
+        <div class="slider-row">
+          <input type="range" id="sl-speed" min="0" max="4" value="2" step="1"
+            oninput="curSpeed=+this.value; document.getElementById('dv-speed').textContent=speedLabels[curSpeed]">
+          <div class="sval-sm" id="dv-speed">normal</div>
+        </div>
+      </div>
+      <div>
+        <span class="cg-label">Play a game (animated)</span>
+        <div class="btn-row">
+          <button class="primary" id="btn-one" onclick="playGame()">▶ play 1 game</button>
+        </div>
+        <span class="cg-label">Run many games</span>
+        <div class="btn-row">
+          <button id="btn-10"  onclick="runMany(10)">10 games</button>
+          <button id="btn-100" onclick="runMany(100)">100</button>
+          <button id="btn-1k"  onclick="runMany(1000)">1k</button>
+          <button id="btn-10k" onclick="runMany(10000)">10k</button>
+        </div>
+        <div class="btn-row">
+          <button class="reset" id="btn-reset" onclick="resetAll()">reset all</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="panel">
+    <div class="panel-label">Results</div>
+    <div class="stats-grid">
+      <div class="stat"><div class="stat-val" id="s-runs">0</div><div class="stat-lbl">games played</div></div>
+      <div class="stat"><div class="stat-val" id="s-heads">0</div><div class="stat-lbl">all-heads</div></div>
+      <div class="stat"><div class="stat-val" id="s-exhaust">0</div><div class="stat-lbl">exhausted</div></div>
+      <div class="stat"><div class="stat-val" id="s-avg">—</div><div class="stat-lbl">avg rounds</div></div>
+    </div>
+    <div class="outcome-section" id="outcome-section" style="display:none;">
+      <div class="outcome-card heads-card">
+        <div class="outcome-title">All Heads</div>
+        <div class="outcome-big" id="pct-heads">0%</div>
+        <div class="outcome-sub" id="cnt-heads">0 games</div>
+        <div class="bar-track"><div class="bar-fill" id="bar-heads"></div></div>
+      </div>
+      <div class="outcome-card exhaust-card">
+        <div class="outcome-title">Exhausted</div>
+        <div class="outcome-big" id="pct-exhaust">0%</div>
+        <div class="outcome-sub" id="cnt-exhaust">0 games</div>
+        <div class="bar-track"><div class="bar-fill" id="bar-exhaust"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Running probability chart -->
+  <div class="panel" id="chart-panel" style="display:none;">
+    <div class="panel-label">All-heads probability over time</div>
+    <div class="chart-legend">
+      <span><span class="legend-dot" style="background:#c8f5a0"></span>observed probability</span>
+      <span><span class="legend-dot" style="background:#a78bfa; opacity:0.5"></span>50% theoretical</span>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="prob-canvas"></canvas>
+    </div>
+  </div>
+
+  <!-- Live game -->
+  <div class="panel">
+    <div class="game-header">
+      <div class="panel-label" style="margin-bottom:0;">Live game</div>
+      <div id="round-badge" class="round-badge" style="visibility:hidden;">
+        round <span id="round-num">—</span> / <span id="round-total">—</span>
+      </div>
+      <div id="result-wrap"></div>
+    </div>
+    <div class="coin-arena" id="coins">
+      <div class="empty-hint">press "play 1 game" to watch a game unfold</div>
+    </div>
+  </div>
+
+  <!-- Round history -->
+  <div class="panel">
+    <div class="panel-label">Round history</div>
+    <div class="round-history" id="round-history">
+      <div class="empty-hint">rounds will appear here as the game plays</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  /* ── State ── */
+  let totalRuns = 0, totalHeads = 0, totalExhaust = 0, totalRoundsSum = 0;
+  let numCoins = 25, curSpeed = 2, animating = false;
+
+  // Probability history: array of {game, prob} for chart
+  // We store a snapshot every game, but downsample for large counts
+  let probHistory = [];
+
+  const speedLabels = ['very slow','slow','normal','fast','instant'];
+  const speedMs     = [1000, 550, 280, 110, 0];
+
+  /* ── THE FIX ──
+     Win condition: all CURRENTLY ALIVE coins show heads on the same round.
+     This is `headsCount === prevCount`, NOT `headsCount === numCoins`.
+     Using numCoins (the starting count) made a win impossible after any coin
+     was removed, since headsCount can never grow back to the original total.
+  */
+  function simulate(n) {
+    let alive = Array(n).fill(true);
+    const rounds = [];
+    while (true) {
+      const prevCount  = alive.filter(Boolean).length;
+      const flipped    = alive.map(a => a ? Math.random() < 0.5 : null);
+      const newAlive   = alive.map((a, i) => a && flipped[i] === true);
+      const headsCount = newAlive.filter(Boolean).length;
+      const tailsCount = alive.reduce((s, a, i) => s + (a && flipped[i] === false ? 1 : 0), 0);
+
+      rounds.push({ alive:[...alive], flipped:[...flipped], newAlive:[...newAlive], headsCount, tailsCount, prevCount });
+
+      if (headsCount === prevCount) return { outcome: 'heads',  rounds }; // all remaining = heads
+      if (headsCount === 0)         return { outcome: 'exhaust', rounds }; // none left
+
+      alive = newAlive;
+    }
+  }
+
+  /* ── Stats & chart ── */
+  function recordGame(outcome, roundCount) {
+    totalRuns++;
+    totalRoundsSum += roundCount;
+    if (outcome === 'heads') totalHeads++; else totalExhaust++;
+    probHistory.push(totalHeads / totalRuns);
+  }
+
+  function updateStats() {
+    document.getElementById('s-runs').textContent    = totalRuns.toLocaleString();
+    document.getElementById('s-heads').textContent   = totalHeads.toLocaleString();
+    document.getElementById('s-exhaust').textContent = totalExhaust.toLocaleString();
+    if (totalRuns > 0) {
+      document.getElementById('s-avg').textContent = (totalRoundsSum / totalRuns).toFixed(1);
+      const ph = totalHeads / totalRuns;
+      document.getElementById('outcome-section').style.display = 'grid';
+      document.getElementById('pct-heads').textContent   = (ph * 100).toFixed(1) + '%';
+      document.getElementById('pct-exhaust').textContent = ((1-ph) * 100).toFixed(1) + '%';
+      document.getElementById('cnt-heads').textContent   = totalHeads.toLocaleString() + ' games';
+      document.getElementById('cnt-exhaust').textContent = totalExhaust.toLocaleString() + ' games';
+      document.getElementById('bar-heads').style.width   = (ph * 100) + '%';
+      document.getElementById('bar-exhaust').style.width = ((1-ph) * 100) + '%';
+      document.getElementById('chart-panel').style.display = 'block';
+      drawChart();
+    }
+  }
+
+  /* ── Canvas chart ── */
+  function drawChart() {
+    const canvas = document.getElementById('prob-canvas');
+    const dpr    = window.devicePixelRatio || 1;
+    const W      = canvas.offsetWidth;
+    const H      = canvas.offsetHeight;
+    canvas.width  = W * dpr;
+    canvas.height = H * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    const PAD = { top: 10, right: 14, bottom: 28, left: 42 };
+    const pw  = W - PAD.left - PAD.right;
+    const ph  = H - PAD.top  - PAD.bottom;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Downsample history to at most 300 points for clarity
+    const raw = probHistory;
+    let pts = raw;
+    if (raw.length > 300) {
+      pts = [];
+      const step = raw.length / 300;
+      for (let i = 0; i < 300; i++) pts.push(raw[Math.floor(i * step)]);
+      pts.push(raw[raw.length - 1]);
+    }
+
+    // Axes
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = 0.5;
+    for (let pct of [0, 25, 50, 75, 100]) {
+      const y = PAD.top + ph * (1 - pct / 100);
+      ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(PAD.left + pw, y); ctx.stroke();
+      ctx.fillStyle = '#4a4858';
+      ctx.font = '10px DM Mono, monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(pct + '%', PAD.left - 6, y + 3.5);
+    }
+
+    // x-axis label
+    ctx.fillStyle = '#4a4858';
+    ctx.font = '10px DM Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('games played', PAD.left + pw / 2, H - 2);
+
+    // 50% reference line
+    const refY = PAD.top + ph * 0.5;
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = 'rgba(167,139,250,0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(PAD.left, refY); ctx.lineTo(PAD.left + pw, refY); ctx.stroke();
+    ctx.setLineDash([]);
+
+    if (pts.length < 2) return;
+
+    // Probability line
+    ctx.strokeStyle = '#c8f5a0';
+    ctx.lineWidth = 1.8;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    pts.forEach((p, i) => {
+      const x = PAD.left + (i / (pts.length - 1)) * pw;
+      const y = PAD.top  + ph * (1 - p);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // Current value dot
+    const lastP = pts[pts.length - 1];
+    const dotX  = PAD.left + pw;
+    const dotY  = PAD.top  + ph * (1 - lastP);
+    ctx.fillStyle = '#c8f5a0';
+    ctx.beginPath(); ctx.arc(dotX, dotY, 3.5, 0, Math.PI * 2); ctx.fill();
+
+    // Current value label
+    ctx.fillStyle = '#c8f5a0';
+    ctx.font = '500 11px DM Mono, monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText((lastP * 100).toFixed(1) + '%', PAD.left + pw - 6, dotY - 6);
+
+    // x-axis tick labels
+    ctx.fillStyle = '#4a4858';
+    ctx.font = '10px DM Mono, monospace';
+    ctx.textAlign = 'center';
+    const xTicks = [1, Math.round(totalRuns / 2), totalRuns];
+    xTicks.forEach(v => {
+      const idx = raw.indexOf(raw[Math.min(v - 1, raw.length - 1)]);
+      const x   = PAD.left + ((Math.min(v - 1, raw.length - 1)) / (raw.length - 1 || 1)) * pw;
+      ctx.fillText(v.toLocaleString(), x, PAD.top + ph + 18);
+    });
+  }
+
+  /* ── UI helpers ── */
+  function setUI(disabled) {
+    ['btn-one','btn-10','btn-100','btn-1k','btn-10k','btn-reset']
+      .forEach(id => { const el = document.getElementById(id); if (el) el.disabled = disabled; });
+  }
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  /* ── Coin grid ── */
+  function buildGrid(n) {
+    const arena = document.getElementById('coins');
+    arena.innerHTML = '';
+    for (let i = 0; i < n; i++) {
+      const d = document.createElement('div');
+      d.className = 'coin s-idle'; d.id = 'c' + i; d.textContent = '?';
+      arena.appendChild(d);
+    }
+  }
+  function setCoin(i, cls, label) {
+    const el = document.getElementById('c' + i);
+    if (el) { el.className = 'coin ' + cls; el.textContent = label; }
+  }
+
+  /* ── History row ── */
+  function addHistoryRow(ri, r, isFinal, outcome) {
+    const hist = document.getElementById('round-history');
+    if (ri === 0) { const ph = hist.querySelector('.empty-hint'); if (ph) ph.remove(); }
+    const existing = hist.querySelector('[data-ri="'+ri+'"]');
+    if (existing) existing.remove();
+
+    const row = document.createElement('div');
+    row.className = 'rrow' + (isFinal ? (outcome === 'heads' ? ' final-h' : ' final-e') : '');
+    row.dataset.ri = ri;
+
+    const numEl = document.createElement('div');
+    numEl.className = 'rn';
+    numEl.textContent = 'round ' + (ri + 1);
+
+    const det = document.createElement('div');
+    det.className = 'rd';
+    if (isFinal && outcome === 'heads')
+      det.innerHTML = `all <span class="ch">${r.headsCount}H</span> — all heads!`;
+    else if (isFinal && outcome === 'exhaust')
+      det.innerHTML = `last <span class="ct">${r.tailsCount}T</span> removed — none remain`;
+    else
+      det.innerHTML = `<span class="ch">${r.headsCount}H</span> kept &nbsp;·&nbsp; <span class="ct">${r.tailsCount}T</span> removed`;
+
+    row.appendChild(numEl); row.appendChild(det);
+    hist.appendChild(row);
+    hist.scrollTop = hist.scrollHeight;
+    requestAnimationFrame(() => row.classList.add('show'));
+  }
+
+  /* ── Animated game ── */
+  async function animateGame(result, n) {
+    const ms = speedMs[curSpeed];
+    document.getElementById('round-badge').style.visibility = 'visible';
+    document.getElementById('round-total').textContent = result.rounds.length;
+    document.getElementById('result-wrap').innerHTML = '';
+    document.getElementById('round-history').innerHTML = '';
+    buildGrid(n);
+
+    if (ms > 0) await sleep(ms * 0.4);
+
+    for (let ri = 0; ri < result.rounds.length; ri++) {
+      const r = result.rounds[ri];
+      const isFinal = ri === result.rounds.length - 1;
+      document.getElementById('round-num').textContent = ri + 1;
+
+      // Phase 1: reveal flips
+      for (let i = 0; i < n; i++) {
+        if (!r.alive[i]) continue;
+        setCoin(i, r.flipped[i] ? 's-heads' : 's-tails', r.flipped[i] ? 'H' : 'T');
+      }
+      if (ms > 0) await sleep(ms);
+
+      // Phase 2: shrink tails
+      for (let i = 0; i < n; i++) {
+        if (r.alive[i] && r.flipped[i] === false) setCoin(i, 's-remove', 'T');
+      }
+      if (ms > 0) await sleep(ms * 0.5);
+
+      // Phase 3: collapse slots (keep space so layout is stable)
+      for (let i = 0; i < n; i++) {
+        if (r.alive[i] && r.flipped[i] === false) setCoin(i, 's-gone', '');
+      }
+
+      addHistoryRow(ri, r, isFinal, result.outcome);
+      if (!isFinal && ms > 0) await sleep(ms * 0.3);
+    }
+
+    document.getElementById('result-wrap').innerHTML = result.outcome === 'heads'
+      ? '<span class="result-tag all-heads">ended by all heads</span>'
+      : '<span class="result-tag exhausted">ended by exhaustion</span>';
+  }
+
+  /* ── Public actions ── */
+  async function playGame() {
+    if (animating) return;
+    animating = true; setUI(true);
+    const n = numCoins;
+    const result = simulate(n);
+    recordGame(result.outcome, result.rounds.length);
+    updateStats();
+    await animateGame(result, n);
+    animating = false; setUI(false);
+  }
+
+  function runMany(count) {
+    if (animating) return;
+    for (let i = 0; i < count; i++) {
+      const r = simulate(numCoins);
+      recordGame(r.outcome, r.rounds.length);
+    }
+    updateStats();
+    document.getElementById('coins').innerHTML = '<div class="empty-hint">press "play 1 game" to watch a game unfold</div>';
+    document.getElementById('round-history').innerHTML = '<div class="empty-hint">rounds will appear here as the game plays</div>';
+    document.getElementById('result-wrap').innerHTML = '';
+    document.getElementById('round-badge').style.visibility = 'hidden';
+  }
+
+  function resetAll() {
+    if (animating) return;
+    totalRuns = 0; totalHeads = 0; totalExhaust = 0; totalRoundsSum = 0;
+    probHistory = [];
+    ['s-runs','s-heads','s-exhaust'].forEach(id => document.getElementById(id).textContent = '0');
+    document.getElementById('s-avg').textContent = '—';
+    document.getElementById('outcome-section').style.display = 'none';
+    document.getElementById('chart-panel').style.display = 'none';
+    document.getElementById('coins').innerHTML = '<div class="empty-hint">press "play 1 game" to watch a game unfold</div>';
+    document.getElementById('round-history').innerHTML = '<div class="empty-hint">rounds will appear here as the game plays</div>';
+    document.getElementById('result-wrap').innerHTML = '';
+    document.getElementById('round-badge').style.visibility = 'hidden';
+  }
+
+  window.addEventListener('resize', () => { if (totalRuns > 0) drawChart(); });
+</script>
+</body>
+</html>
